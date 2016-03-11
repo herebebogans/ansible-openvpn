@@ -1,0 +1,48 @@
+---
+# tasks file for openvpn
+- name: Install OpenVPN
+  include: install.yml
+  tags:
+    - install
+
+- name: Setup server keys
+  include: server_keys.yml
+  tags:
+    - server_keys
+
+# ignoreerrors is required for CentOS/RHEL 6
+# http://serverfault.com/questions/477718/sysctl-p-etc-sysctl-conf-returns-error
+- name: enable ipv4 forwarding
+  sysctl: name=net.ipv4.ip_forward value=1 ignoreerrors=yes
+
+- name: Check for firewalld/iptables
+  command: firewall-cmd --state
+  register: firewalld
+  always_run: yes
+  changed_when: false  # Never report as changed
+  ignore_errors: yes
+  tags:
+    - firewall
+
+- name: Add port rules (iptables)
+  include: iptables.yml
+  when: firewalld.rc!=0
+  tags:
+    - firewall
+
+- name: Add port rules (firewalld)
+  include: firewalld.yml
+  when: firewalld.rc==0
+  tags:
+    - firewall
+
+- name: generate client configs
+  include: client_keys.yml
+  when: clients is defined
+  tags:
+    - client_keys
+
+- name: configure OpenVPN
+  include: config.yml
+  tags:
+    - configure
